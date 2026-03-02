@@ -20,16 +20,28 @@ MINIMAX_GROUP_ID = os.getenv("MINIMAX_GROUP_ID", "")
 MINIMAX_API_URL = "https://api.minimax.chat/v1/image_generation"
 
 
-def _extract_image_base64(response_data: dict) -> str:
-    """Extract base64 image from Minimax response."""
+def _extract_image_data(response_data: dict) -> tuple[str, str]:
+    """Extract image base64/url from Minimax response."""
     try:
-        # Minimax returns base64 directly in the response
-        if "data" in response_data and len(response_data["data"]) > 0:
-            image_base64 = response_data["data"][0].get("base64", "")
-            if image_base64:
-                return image_base64
-        
-        raise Exception(f"Base64 data not found in response: {json.dumps(response_data)[:500]}")
+        data = response_data.get("data")
+
+        # Old format: data is list with {"base64": "..."}
+        if isinstance(data, list) and len(data) > 0:
+            first_item = data[0] if isinstance(data[0], dict) else {}
+            image_base64 = first_item.get("base64", "")
+            image_url = first_item.get("url", "")
+            if image_base64 or image_url:
+                return image_base64, image_url
+
+        # New format: data is dict with {"image_urls": ["https://..."]}
+        if isinstance(data, dict):
+            image_urls = data.get("image_urls", [])
+            if isinstance(image_urls, list) and len(image_urls) > 0:
+                first_url = image_urls[0]
+                if isinstance(first_url, str) and first_url:
+                    return "", first_url
+
+        raise Exception(f"Image data not found in response: {json.dumps(response_data)[:500]}")
     except Exception as e:
         raise Exception(f"Failed to parse image response: {json.dumps(response_data)[:500]}. Error: {str(e)}")
 
@@ -88,18 +100,28 @@ def text_to_image(prompt: str, output_path: str = None, **kwargs) -> str:
     if "base_resp" in result and result["base_resp"].get("status_code") != 0:
         raise Exception(f"Minimax API Error: {result['base_resp'].get('status_msg', 'Unknown error')}")
     
-    image_data = _extract_image_base64(result)
+    image_base64, image_url = _extract_image_data(result)
 
     if output_path:
-        # Add padding if necessary
-        image_data += "=" * ((4 - len(image_data) % 4) % 4)
-        image_bytes = base64.b64decode(image_data)
+        if image_base64:
+            # Add padding if necessary
+            image_base64 += "=" * ((4 - len(image_base64) % 4) % 4)
+            image_bytes = base64.b64decode(image_base64)
+        elif image_url:
+            image_resp = requests.get(image_url, timeout=kwargs.get("timeout", 180))
+            if not image_resp.ok:
+                raise Exception(f"Image download failed {image_resp.status_code}: {image_resp.text[:300]}")
+            image_bytes = image_resp.content
+        else:
+            raise Exception("No base64 data or image URL returned from Minimax")
+
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, "wb") as f:
             f.write(image_bytes)
         return output_path
 
-    return image_data
+    # Keep backward compatibility: prefer returning base64 when no output path provided.
+    return image_base64 or image_url
 
 
 def text_to_image_sync(prompt: str, timeout: int = 120) -> str:
