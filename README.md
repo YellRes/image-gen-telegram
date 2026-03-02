@@ -13,6 +13,7 @@ Text to Image using Minimax API with Telegram Bot integration
 1. Install dependencies:
 ```bash
 pip install -r requirements.txt
+playwright install chromium
 ```
 
 2. Configure environment variables:
@@ -26,6 +27,13 @@ Or set environment variables:
 export TG_BOT_TOKEN=your-telegram-bot-token
 export MINIMAX_API_KEY=your-minimax-api-key
 export MINIMAX_GROUP_ID=your-minimax-group-id
+```
+
+Windows PowerShell example:
+```powershell
+$env:TG_BOT_TOKEN="your-telegram-bot-token"
+$env:MINIMAX_API_KEY="your-minimax-api-key"
+$env:MINIMAX_GROUP_ID="your-minimax-group-id"
 ```
 
 ## Telegram Bot Setup
@@ -77,6 +85,39 @@ result = text_to_image(
 
 ### Telegram Bot
 Just send any text to your bot and it will generate an image!
+
+## Douyin Auto Publish (Image Post)
+
+When enabled, the bot will publish generated images to Douyin creator center automatically.
+
+1. Prepare Playwright and dependencies:
+```powershell
+pip install -r requirements.txt
+playwright install chromium
+```
+
+2. Configure `.env`:
+```dotenv
+ENABLE_DOUYIN_IMAGE_PUBLISH=true
+DOUYIN_ACCOUNT_FILE=
+DOUYIN_LOGIN_INTERACTIVE=false
+DOUYIN_PUBLISH_TAGS=AI绘画,自动发布
+```
+
+3. Generate/refresh Douyin cookie once (interactive login):
+```powershell
+python verify_douyin_image_publish.py --title "登录初始化" --images .\temp\sample.jpeg --interactive-login
+```
+
+4. Start Telegram bot:
+```powershell
+python telegram_bot.py
+```
+
+5. Minimal publish verification (without Telegram):
+```powershell
+python verify_douyin_image_publish.py --title "自动发布测试" --images .\temp\1.jpeg .\temp\2.jpeg --tags AI 自动化
+```
 
 ## Get API Keys
 

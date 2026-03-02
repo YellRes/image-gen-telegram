@@ -15,6 +15,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # Import our text to image module
 from text_to_image import text_to_image
+from douyin_image_publish import (
+    is_douyin_publish_enabled,
+    parse_env_tags,
+    publish_images_to_douyin,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +35,10 @@ load_dotenv()
 TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN", "")
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 PROXY_URL = os.getenv("PROXY_URL", "")
+ENABLE_DOUYIN_IMAGE_PUBLISH = is_douyin_publish_enabled()
+DOUYIN_ACCOUNT_FILE = os.getenv("DOUYIN_ACCOUNT_FILE", "")
+DOUYIN_LOGIN_INTERACTIVE = os.getenv("DOUYIN_LOGIN_INTERACTIVE", "false").strip().lower() in {"1", "true", "yes", "on"}
+DOUYIN_EXTRA_TAGS = parse_env_tags(os.getenv("DOUYIN_PUBLISH_TAGS", ""))
 
 from prompt_manager import QUALITY_PRESETS, DEFAULT_QUALITY, STYLE_PRESETS, DEFAULT_STYLE, prompt_builder
 DEFAULT_IMAGE_COUNT = 1
@@ -103,6 +112,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     image_count = context.user_data.get("image_count", DEFAULT_IMAGE_COUNT)
     status.append(f"🖼️ Current Image Count: {image_count}")
+    status.append(f"📤 Douyin Auto Publish: {'ON' if ENABLE_DOUYIN_IMAGE_PUBLISH else 'OFF'}")
     
     await update.message.reply_text("\n".join(status))
 
@@ -256,6 +266,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     photo=photo,
                     caption=f"✅ Generated {i + 1}/{image_count} from: {prompt}"
                 )
+
+        if ENABLE_DOUYIN_IMAGE_PUBLISH:
+            publish_msg = await update.message.reply_text("📤 正在自动发布到抖音图文...")
+            try:
+                await publish_images_to_douyin(
+                    title=prompt,
+                    image_paths=generated_paths,
+                    tags=DOUYIN_EXTRA_TAGS,
+                    account_file=DOUYIN_ACCOUNT_FILE or None,
+                    handle_login=DOUYIN_LOGIN_INTERACTIVE,
+                )
+                await publish_msg.edit_text("✅ 抖音图文发布成功")
+            except Exception as publish_err:
+                logger.exception("Douyin publish failed: %s", publish_err)
+                await publish_msg.edit_text(f"⚠️ 抖音发布失败: {publish_err}")
 
         await processing_msg.delete()
         
