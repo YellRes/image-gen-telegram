@@ -29,27 +29,9 @@ load_dotenv()
 # Environment variables
 TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN", "")
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
-MINIMAX_GROUP_ID = os.getenv("MINIMAX_GROUP_ID", "")
+PROXY_URL = os.getenv("PROXY_URL", "")
 
-# Per-user quality presets (Minimax image_generation has no direct quality field).
-QUALITY_PRESETS = {
-    "low": {
-        "label": "低质量(更快)",
-        "aspect_ratio": "1:1",
-        "prompt_suffix": "simple composition, fewer details",
-    },
-    "medium": {
-        "label": "中质量(平衡)",
-        "aspect_ratio": "1:1",
-        "prompt_suffix": "clean composition, natural lighting",
-    },
-    "high": {
-        "label": "高质量(更慢)",
-        "aspect_ratio": "1:1",
-        "prompt_suffix": "highly detailed, sharp focus, cinematic lighting",
-    },
-}
-DEFAULT_QUALITY = "medium"
+from prompt_manager import QUALITY_PRESETS, DEFAULT_QUALITY, STYLE_PRESETS, DEFAULT_STYLE, prompt_builder
 DEFAULT_IMAGE_COUNT = 1
 MAX_IMAGE_COUNT = 4
 
@@ -71,6 +53,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - Check configuration status\n"
         "/quality - Show current quality\n"
         "/quality low|medium|high - Set quality\n"
+        "/style - Show current style\n"
+        "/style default|comic - Set style\n"
         "/count - Show current image count\n"
         f"/count 1-{MAX_IMAGE_COUNT} - Set image count"
     )
@@ -86,6 +70,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Example: 'A cute cat sitting on a sofa'\n\n"
         "Quality control:\n"
         "/quality low|medium|high\n\n"
+        "Style control:\n"
+        "/style default|comic\n\n"
         "Image count control:\n"
         f"/count 1-{MAX_IMAGE_COUNT}\n\n"
         "Note: Make sure the bot is properly configured with API keys."
@@ -106,15 +92,15 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status.append("✅ Minimax API Key: Configured")
     else:
         status.append("❌ Minimax API Key: NOT SET (MINIMAX_API_KEY)")
-    
-    if MINIMAX_GROUP_ID:
-        status.append("ℹ️ Minimax Group ID: Configured (optional)")
-    else:
-        status.append("ℹ️ Minimax Group ID: NOT SET (optional)")
 
     quality = context.user_data.get("quality", DEFAULT_QUALITY)
     quality_label = QUALITY_PRESETS.get(quality, QUALITY_PRESETS[DEFAULT_QUALITY])["label"]
     status.append(f"🎛️ Current Quality: {quality} ({quality_label})")
+    
+    style = context.user_data.get("style", DEFAULT_STYLE)
+    style_label = STYLE_PRESETS.get(style, STYLE_PRESETS[DEFAULT_STYLE])["label"]
+    status.append(f"🎨 Current Style: {style} ({style_label})")
+    
     image_count = context.user_data.get("image_count", DEFAULT_IMAGE_COUNT)
     status.append(f"🖼️ Current Image Count: {image_count}")
     
@@ -156,6 +142,43 @@ async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["quality"] = level
     await update.message.reply_text(
         f"✅ 已切换质量到: {level} ({QUALITY_PRESETS[level]['label']})"
+    )
+
+
+async def style_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Get or set image style profile."""
+    args = context.args
+
+    if not args:
+        current = context.user_data.get("style", DEFAULT_STYLE)
+        current_label = STYLE_PRESETS.get(current, STYLE_PRESETS[DEFAULT_STYLE])["label"]
+        
+        style_options = []
+        for k, v in STYLE_PRESETS.items():
+            style_options.append(f"- {k}: {v['label']}")
+        
+        options_text = "\n".join(style_options)
+            
+        await update.message.reply_text(
+            "🎨 当前图片风格设置:\n"
+            f"- {current} ({current_label})\n\n"
+            "可用风格:\n"
+            f"{options_text}\n\n"
+            "使用方式: /style default|comic"
+        )
+        return
+
+    level = args[0].strip().lower()
+
+    if level not in STYLE_PRESETS:
+        await update.message.reply_text(
+            "❌ 无效风格。请使用: /style default|comic"
+        )
+        return
+
+    context.user_data["style"] = level
+    await update.message.reply_text(
+        f"✅ 已切换风格到: {level} ({STYLE_PRESETS[level]['label']})"
     )
 
 
@@ -205,13 +228,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     quality = context.user_data.get("quality", DEFAULT_QUALITY)
-    preset = QUALITY_PRESETS.get(quality, QUALITY_PRESETS[DEFAULT_QUALITY])
+    style = context.user_data.get("style", DEFAULT_STYLE)
+    preset = prompt_builder.get_preset(quality)
+    generation_prompt = prompt_builder.build(prompt, quality, style)
     image_count = context.user_data.get("image_count", DEFAULT_IMAGE_COUNT)
-    generation_prompt = f"{prompt}, {preset['prompt_suffix']}"
 
     # Send "generating" message
     processing_msg = await update.message.reply_text(
-        f"🎨 Generating image... quality={quality}, count={image_count}"
+        f"🎨 Generating image... quality={quality}, style={style}, count={image_count}"
     )
     
     generated_paths = []
@@ -221,7 +245,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             image_path = text_to_image(
                 prompt=generation_prompt,
                 output_path=output_path,
-                aspect_ratio=preset["aspect_ratio"],
+                aspect_ratio=preset.get("aspect_ratio"),
+                image_size=preset.get("image_size"),
                 model="image-01",
             )
             generated_paths.append(image_path)
@@ -263,13 +288,17 @@ def main():
     print(f"📝 Bot will generate images using Minimax API")
     
     # Create application
-    application = Application.builder().token(TG_BOT_TOKEN).build()
+    builder = Application.builder().token(TG_BOT_TOKEN)
+    if PROXY_URL:
+        builder = builder.proxy_url(PROXY_URL).get_updates_proxy_url(PROXY_URL)
+    application = builder.build()
     
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("quality", quality_command))
+    application.add_handler(CommandHandler("style", style_command))
     application.add_handler(CommandHandler("count", count_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
