@@ -24,3 +24,13 @@
   - new: `data.image_urls[0]`
 - When `output_path` is provided and response contains URL, image is downloaded and saved locally.
 - This unblocks Telegram -> Playwright Douyin flow when Minimax no longer returns base64.
+
+## 2026-03-05 Post-generate Publish Orchestration
+- Added async orchestrator `generate_and_publish_to_douyin(...)` in `text_to_image.py`.
+- Orchestrator supports both:
+  - generate-then-publish (via `output_path`)
+  - publish-existing-images (via `image_paths`)
+- Unified Telegram publish call path in `telegram_bot.py` to use orchestrator result status.
+- Hardened publish failure handling:
+  - keep generation success path
+  - return/propagate publish status and error message cleanly for user notification.

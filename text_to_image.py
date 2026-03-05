@@ -7,7 +7,7 @@ import requests
 import base64
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Iterable, Dict, Any
 
 from dotenv import load_dotenv
 
@@ -18,6 +18,12 @@ MINIMAX_GROUP_ID = os.getenv("MINIMAX_GROUP_ID", "")
 
 # API endpoints
 MINIMAX_API_URL = "https://api.minimax.chat/v1/image_generation"
+
+try:
+    from douyin_image_publish import publish_images_to_douyin, is_douyin_publish_enabled
+except Exception:
+    publish_images_to_douyin = None
+    is_douyin_publish_enabled = None
 
 
 def _extract_image_data(response_data: dict) -> tuple[str, str]:
@@ -129,6 +135,64 @@ def text_to_image_sync(prompt: str, timeout: int = 120) -> str:
     Backward-compatible wrapper.
     """
     return text_to_image(prompt=prompt, timeout=timeout)
+
+
+async def generate_and_publish_to_douyin(
+    prompt: str,
+    output_path: Optional[str] = None,
+    image_paths: Optional[Iterable[str]] = None,
+    publish_enabled: Optional[bool] = None,
+    title: Optional[str] = None,
+    tags: Optional[Iterable[str]] = None,
+    account_file: Optional[str] = None,
+    handle_login: bool = False,
+    **kwargs,
+) -> Dict[str, Any]:
+    """
+    Generate image first, then optionally publish to Douyin image post.
+    """
+    files = [str(Path(p)) for p in (image_paths or []) if p and Path(p).exists()]
+    if not files:
+        if not output_path:
+            raise ValueError("Either output_path or image_paths must be provided")
+        generated_path = text_to_image(prompt=prompt, output_path=output_path, **kwargs)
+        files = [generated_path]
+
+    result = {
+        "image_paths": files,
+        "publish_attempted": False,
+        "publish_status": "skipped",
+        "publish_error": "",
+    }
+
+    if publish_enabled is None:
+        if is_douyin_publish_enabled is None:
+            publish_enabled = False
+        else:
+            publish_enabled = is_douyin_publish_enabled()
+
+    if not publish_enabled:
+        return result
+
+    if publish_images_to_douyin is None:
+        result["publish_status"] = "failed"
+        result["publish_error"] = "douyin_image_publish import failed"
+        return result
+
+    result["publish_attempted"] = True
+    try:
+        await publish_images_to_douyin(
+            title=title or prompt,
+            image_paths=files,
+            tags=tags,
+            account_file=account_file,
+            handle_login=handle_login,
+        )
+        result["publish_status"] = "success"
+    except Exception as exc:
+        result["publish_status"] = "failed"
+        result["publish_error"] = str(exc)
+    return result
 
 
 # CLI interface

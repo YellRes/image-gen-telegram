@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sqlite3
+import sys
 import threading
 import time
 import uuid
@@ -12,6 +13,12 @@ from flask import Flask, request, jsonify, Response, render_template, send_from_
 from conf import BASE_DIR
 from myUtils.login import get_tencent_cookie, douyin_cookie_gen, get_ks_cookie, xiaohongshu_cookie_gen
 from myUtils.postVideo import post_video_tencent, post_video_DouYin, post_video_ks, post_video_xhs
+
+# Avoid Windows console encoding crashes when printing Chinese/emoji logs.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 active_queues = {}
 app = Flask(__name__)
@@ -221,8 +228,8 @@ def getAccounts():
         }), 500
 
 
-@app.route("/getValidAccounts",methods=['GET'])
-async def getValidAccounts():
+@app.route("/getValidAccounts", methods=['GET'])
+def getValidAccounts():
     with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -233,14 +240,14 @@ async def getValidAccounts():
         for row in rows:
             print(row)
         for row in rows_list:
-            flag = await check_cookie(row[1],row[2])
+            flag = asyncio.run(check_cookie(row[1], row[2]))
             if not flag:
                 row[4] = 0
                 cursor.execute('''
                 UPDATE user_info 
                 SET status = ? 
                 WHERE id = ?
-                ''', (0,row[0]))
+                ''', (0, row[0]))
                 conn.commit()
                 print("✅ 用户状态已更新")
         for row in rows:
@@ -250,7 +257,7 @@ async def getValidAccounts():
                             "code": 200,
                             "msg": None,
                             "data": rows_list
-                        }),200
+                        }), 200
 
 @app.route('/deleteFile', methods=['GET'])
 def delete_file():

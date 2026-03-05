@@ -37,6 +37,6 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS file_records (
 
 # 提交更改
 conn.commit()
-print("✅ 表创建成功")
+print("Tables created successfully")
 # 关闭连接
 conn.close()

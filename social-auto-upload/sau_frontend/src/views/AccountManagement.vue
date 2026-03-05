@@ -672,7 +672,7 @@ const handleDelete = (row) => {
 // 下载Cookie文件
 const handleDownloadCookie = (row) => {
   // 从后端获取Cookie文件
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
   const downloadUrl = `${baseUrl}/downloadCookie?filePath=${encodeURIComponent(row.filePath)}`
 
   // 创建一个隐藏的链接来触发下载
@@ -714,7 +714,7 @@ const handleUploadCookie = (row) => {
       formData.append('platform', row.platform)
 
       // 发送上传请求
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
       const response = await fetch(`${baseUrl}/uploadCookie`, {
         method: 'POST',
         body: formData
@@ -803,7 +803,7 @@ const connectSSE = (platform, name) => {
   const type = platformTypeMap[platform] || '1'
 
   // 创建SSE连接
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
   const url = `${baseUrl}/login?type=${type}&id=${encodeURIComponent(name)}`
 
   eventSource = new EventSource(url)
