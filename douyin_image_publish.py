@@ -98,3 +98,16 @@ def parse_env_tags(raw: str) -> List[str]:
 
 def is_douyin_publish_enabled() -> bool:
     return os.getenv("ENABLE_DOUYIN_IMAGE_PUBLISH", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+if __name__ == '__main__':
+    import asyncio
+    # path 示例（任选一种写法）：
+    # 相对路径（相对当前工作目录）:
+    #   image_paths = ["images/pic.jpg"]
+    # Windows 绝对路径用正斜杠或 raw 字符串:
+    #   image_paths = [r"d:\python-playground\telegram-image-gen\images\pic.jpg"]
+    #   image_paths = ["d:/python-playground/telegram-image-gen/images/pic.jpg"]
+    image_paths = ["d:/python-playground/telegram-image-gen/images/Screenshot.png"]  # 改成实际存在的图片路径
+    # 首次运行建议开启 handle_login=True，会拉起浏览器登录并保存 cookie。
+    asyncio.run(publish_images_to_douyin("test", image_paths, handle_login=True))

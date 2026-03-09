@@ -21,11 +21,15 @@ class DouYinImagePost(object):
         self.headless = LOCAL_CHROME_HEADLESS
 
     async def _open_image_publish_page(self, page: Page):
-        await page.goto("https://creator.douyin.com/creator-micro/content/upload")
+        await page.goto(
+            "https://creator.douyin.com/creator-micro/content/upload",
+            wait_until="domcontentloaded",
+            timeout=90000,
+        )
         await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload**")
 
         # 创作者中心有时会先落到视频页，优先切换到图文标签。
-        image_tab = page.get_by_text("图文")
+        image_tab = page.get_by_text("发布图文")
         if await image_tab.count():
             await image_tab.first.click()
             await asyncio.sleep(0.5)
@@ -36,24 +40,34 @@ class DouYinImagePost(object):
 
         files = []
         for path in self.image_paths:
-            if Path(path).exists():
-                files.append(path)
+            try:
+                resolved = Path(path).expanduser().resolve(strict=True)
+                if resolved.is_file():
+                    files.append(str(resolved))
+            except Exception:
+                continue
 
         if not files:
-            raise Exception("All image paths are missing")
+            raise Exception(f"All image paths are missing or invalid: {self.image_paths}")
 
         upload_input = page.locator("input[type='file']").first
         if not await upload_input.count():
             raise Exception("Douyin upload input not found")
 
-        await upload_input.set_input_files(files)
+        try:
+            await page.wait_for_timeout(2000)
+            await upload_input.click()
+            # await upload_input.set_input_files(files)
+            await page.wait_for_timeout(2000)
+        except Exception as exc:
+            raise Exception(f"Failed to set input files: {files}. error={exc}") from exc
 
         # 等待上传结束：出现发布按钮通常代表资源已就绪。
         for _ in range(90):
             publish_button = page.get_by_role("button", name="发布", exact=True)
             if await publish_button.count():
                 return
-            await asyncio.sleep(1)
+            await asyncio.sleep(4)
 
         raise Exception("Douyin image upload timeout")
 
@@ -116,6 +130,7 @@ class DouYinImagePost(object):
             await self._open_image_publish_page(page)
             douyin_logger.info("[+] 正在上传抖音图文")
             await self._upload_images(page)
+            return
             await self._fill_title_and_tags(page)
             await self._publish(page)
             douyin_logger.success("[+] 抖音图文发布成功")

@@ -34,3 +34,20 @@
 - Hardened publish failure handling:
   - keep generation success path
   - return/propagate publish status and error message cleanly for user notification.
+
+## 2026-03-05 Runtime Dependency/Login Fix
+- Installed missing runtime dependency `loguru` in project venv.
+- Added `loguru>=0.7.3` into `requirements.txt` to avoid repeat import errors.
+- Updated `douyin_image_publish.py` local entry to call:
+  - `publish_images_to_douyin(..., handle_login=True)`
+- This enables first-run interactive Douyin login and cookie persistence.
+
+## 2026-03-05 Path Upload Hardening
+- Hardened Douyin image uploader path handling in `image_post.py`.
+- Upload paths now use `Path(...).expanduser().resolve(strict=True)` and must be real files.
+- Added explicit error details when `set_input_files` fails, including resolved file list.
+
+## 2026-03-05 Upload Format Compatibility
+- Added image normalization before Douyin upload.
+- Non-JPEG images (e.g. PNG/WebP) are now converted to JPEG into `cookies/douyin_uploader/upload_cache`.
+- This mitigates Douyin UI error: "暂不支持这个格式".
