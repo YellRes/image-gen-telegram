@@ -51,3 +51,11 @@
 - Added image normalization before Douyin upload.
 - Non-JPEG images (e.g. PNG/WebP) are now converted to JPEG into `cookies/douyin_uploader/upload_cache`.
 - This mitigates Douyin UI error: "暂不支持这个格式".
+
+## 2026-03-05 Douyin Upload State Checks
+- Implemented `cover_setted(self, page)`:
+  - waits for upload progress to start via `container-info*`
+  - then waits until "取消上传" disappears
+- Implemented `douyin_checked(self, page)`:
+  - waits for `div[class^='detectItemTitle']` as validation marker
+- Fixed method calls in `upload()` to pass `page` explicitly.

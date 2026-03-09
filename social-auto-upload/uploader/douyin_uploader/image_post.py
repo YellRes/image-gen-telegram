@@ -50,14 +50,14 @@ class DouYinImagePost(object):
         if not files:
             raise Exception(f"All image paths are missing or invalid: {self.image_paths}")
 
-        upload_input = page.locator("input[type='file']").first
+        upload_input = page.locator("div[class^='container-drag'] >> input[type='file'][accept*='image/']").first
         if not await upload_input.count():
             raise Exception("Douyin upload input not found")
 
         try:
             await page.wait_for_timeout(2000)
-            await upload_input.click()
-            # await upload_input.set_input_files(files)
+            # await upload_input.click()
+            await upload_input.set_input_files(files)
             await page.wait_for_timeout(2000)
         except Exception as exc:
             raise Exception(f"Failed to set input files: {files}. error={exc}") from exc
@@ -113,6 +113,28 @@ class DouYinImagePost(object):
 
         raise Exception("Douyin image post failed or timeout")
 
+    async def cover_setted(self, page: Page, timeout_seconds: int = 180):
+        # 上传中会出现“取消上传”，当该提示消失时视为上传完成，可进行下一步。
+        cancel_upload = page.get_by_text("取消上传")
+        progress_container = page.locator("div[class^='container-info']")
+        started = False
+        for _ in range(timeout_seconds):
+            if not started and await progress_container.count():
+                started = True
+            if started and not await cancel_upload.count():
+                return
+            await asyncio.sleep(1)
+        raise Exception("Douyin image upload did not finish in time (cancel upload still visible)")
+
+    async def douyin_checked(self, page: Page, timeout_seconds: int = 60):
+        # 等待 class 前缀是 detectItemTitle 的 div 出现，视为通过抖音校验。
+        checked_flag = page.locator("div[class^='detectItemTitle']")
+        for _ in range(timeout_seconds):
+            if await checked_flag.count():
+                return
+            await asyncio.sleep(1)
+        raise Exception("Douyin content check marker not found in time")
+
     async def upload(self, playwright: Playwright):
         if self.local_executable_path:
             browser = await playwright.chromium.launch(
@@ -130,8 +152,15 @@ class DouYinImagePost(object):
             await self._open_image_publish_page(page)
             douyin_logger.info("[+] 正在上传抖音图文")
             await self._upload_images(page)
-            return
-            await self._fill_title_and_tags(page)
+
+    
+            # await page.pause()
+            # await self._fill_title_and_tags(page)
+            
+
+            await page.wait_for_timeout(500)
+            await self.cover_setted(page)
+            await self.douyin_checked(page)
             await self._publish(page)
             douyin_logger.success("[+] 抖音图文发布成功")
             await context.storage_state(path=self.account_file)

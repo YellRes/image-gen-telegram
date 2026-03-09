@@ -108,6 +108,6 @@ if __name__ == '__main__':
     # Windows 绝对路径用正斜杠或 raw 字符串:
     #   image_paths = [r"d:\python-playground\telegram-image-gen\images\pic.jpg"]
     #   image_paths = ["d:/python-playground/telegram-image-gen/images/pic.jpg"]
-    image_paths = ["d:/python-playground/telegram-image-gen/images/Screenshot.png"]  # 改成实际存在的图片路径
+    image_paths = [r"C:\Users\TianruiZhang\Downloads\Gemini_Generated_Image_h17ckph17ckph17c.png"]  # 改成实际存在的图片路径
     # 首次运行建议开启 handle_login=True，会拉起浏览器登录并保存 cookie。
     asyncio.run(publish_images_to_douyin("test", image_paths, handle_login=True))
