@@ -112,6 +112,41 @@ class DouYinImagePost(object):
                 await asyncio.sleep(1)
 
         raise Exception("Douyin image post failed or timeout")
+    
+    # 快速搭建
+    async def quick_setted(self, page: Page):
+        """
+        1. 查找页面中文本为 快速填写的 div, 找到后点击
+        2. 等待页面出现 class=semi-modal-body 的 div
+        3. 选择 class 开头包含 card-container 的第一个子元素 并点击
+        4. 等待一秒钟 查找页面中 class 开发包含 footer-container 的 div , 再找到 div 中文本为 确定 的按钮  点击确定
+        5. 等待 1s 
+        """
+        quick_fill = page.locator("div", has_text="快速填写").first
+        if not await quick_fill.count():
+            douyin_logger.info("未找到“快速填写”入口，跳过快速填写流程")
+            return
+
+        await quick_fill.click()
+
+        modal_body = page.locator("div.semi-modal-body").first
+        await modal_body.wait_for(state="visible", timeout=5000)
+
+        first_card = modal_body.locator("div[class^='card-container']").first
+        if not await first_card.count():
+            raise Exception("快速填写弹窗中未找到卡片项: div[class^='card-container']")
+        await first_card.click()
+
+        await page.wait_for_timeout(1000)
+
+        footer = page.locator("div[class^='footer-container']").first
+        await footer.wait_for(state="visible", timeout=5000)
+        confirm_button = footer.get_by_text("确定", exact=True).first
+        if not await confirm_button.count():
+            raise Exception("快速填写弹窗中未找到“确定”按钮")
+        await confirm_button.click()
+
+        await page.wait_for_timeout(1000)
 
     async def cover_setted(self, page: Page, timeout_seconds: int = 180):
         # 上传中会出现“取消上传”，当该提示消失时视为上传完成，可进行下一步。
@@ -156,6 +191,7 @@ class DouYinImagePost(object):
             await page.wait_for_timeout(500)
             await self.cover_setted(page)
             await self.douyin_checked(page)
+            await self.quick_setted(page)
             await self._publish(page)
             douyin_logger.success("[+] 抖音图文发布成功")
             await context.storage_state(path=self.account_file)

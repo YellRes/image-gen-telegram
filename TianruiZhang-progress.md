@@ -86,3 +86,13 @@
 - Updated `text_to_image.py` CLI default behavior:
   - by default transforms input text via comic explain template (Chinese text requirement included)
   - added `--raw-prompt` to bypass template and send original prompt directly.
+
+## 2026-03-10 Douyin Quick Fill Flow
+- Implemented `quick_setted(self, page)` in `social-auto-upload/uploader/douyin_uploader/image_post.py`.
+- Flow now follows 5-step UI sequence:
+  - click `快速填写`
+  - wait `div.semi-modal-body`
+  - click first `div[class^='card-container']`
+  - wait footer `div[class^='footer-container']`, click `确定`
+  - wait 1s after confirm
+- Added guarded behavior: if `快速填写` entry is missing, log and skip instead of blocking publish.
