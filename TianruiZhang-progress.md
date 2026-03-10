@@ -59,3 +59,30 @@
 - Implemented `douyin_checked(self, page)`:
   - waits for `div[class^='detectItemTitle']` as validation marker
 - Fixed method calls in `upload()` to pass `page` explicitly.
+
+## 2026-03-10 OpenRouter Image Migration
+- Replaced Minimax image generation in `text_to_image.py` with OpenRouter chat completions API:
+  - endpoint: `https://openrouter.ai/api/v1/chat/completions`
+  - auth env: `OPEN_ROUTER_KEY`
+  - default model: `google/gemini-3-flash-preview`
+- Added robust OpenRouter image extraction to support:
+  - `message.images[*]`
+  - `message.content[*].image_url`
+  - data URL base64 and plain image URL in text payloads
+- Updated `telegram_bot.py` config checks/messages to OpenRouter key naming.
+- Updated `.env.example`, `README.md`, and `example.py` to OpenRouter variables and usage examples.
+
+## 2026-03-10 Local Archive By Date
+- Implemented local archive path builder in `telegram_bot.py`:
+  - output path format: `images/YYYY/MM/DD/<userId>_<promptHash>_<index>_<timestamp>.jpeg`
+  - date folders are created by existing `text_to_image.py` parent-dir `mkdir(...)` logic
+- Replaced old Telegram temp output path (`temp/...jpeg`) with archive path builder.
+- Removed Telegram post-send cleanup (`os.remove(...)`) so generated files are retained locally.
+- Updated `README.md` to document date-based archive directory and keep-files behavior.
+
+## 2026-03-10 Fixed Comic Explain Prompt (Chinese)
+- Added fixed template `COMIC_EXPLAIN_ZH_TEMPLATE` in `prompt_manager.py` for "comic explanation of input text".
+- Added `PromptBuilder.build_comic_explain_prompt(...)` and wired `style="comic"` to use the fixed template.
+- Updated `text_to_image.py` CLI default behavior:
+  - by default transforms input text via comic explain template (Chinese text requirement included)
+  - added `--raw-prompt` to bypass template and send original prompt directly.

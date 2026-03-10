@@ -1,11 +1,12 @@
 # Telegram Image Gen
 
-Text to Image using Minimax API with Telegram Bot integration
+Text to Image using OpenRouter API with Telegram Bot integration
 
 ## Features
 
-- 🎨 Text to Image generation using Minimax API
+- 🎨 Text to Image generation using OpenRouter API
 - 🤖 Telegram Bot interface - send text and get images
+- 💾 Auto archive generated images to `images/YYYY/MM/DD/`
 - ⚙️ Easy configuration via environment variables
 
 ## Setup
@@ -25,15 +26,13 @@ cp .env.example .env
 Or set environment variables:
 ```bash
 export TG_BOT_TOKEN=your-telegram-bot-token
-export MINIMAX_API_KEY=your-minimax-api-key
-export MINIMAX_GROUP_ID=your-minimax-group-id
+export OPEN_ROUTER_KEY=your-openrouter-api-key
 ```
 
 Windows PowerShell example:
 ```powershell
 $env:TG_BOT_TOKEN="your-telegram-bot-token"
-$env:MINIMAX_API_KEY="your-minimax-api-key"
-$env:MINIMAX_GROUP_ID="your-minimax-group-id"
+$env:OPEN_ROUTER_KEY="your-openrouter-api-key"
 ```
 
 ## Telegram Bot Setup
@@ -68,7 +67,7 @@ python telegram_bot.py
 
 ### Command Line (without Telegram)
 ```bash
-python text_to_image.py "A beautiful sunset" -o output.png --width 1024 --height 1024
+python text_to_image.py "A beautiful sunset" -o output.png --model google/gemini-3-flash-preview
 ```
 
 ### Python Code
@@ -78,13 +77,16 @@ from text_to_image import text_to_image
 result = text_to_image(
     prompt="Your text description",
     output_path="output.png",
-    width=1024,
-    height=1024
+    model="google/gemini-3-flash-preview"
 )
 ```
 
 ### Telegram Bot
-Just send any text to your bot and it will generate an image!
+Just send any text to your bot and it will generate an image.
+
+Generated images are archived locally by date:
+- `images/YYYY/MM/DD/`
+- Files are kept by default and will not be deleted after sending.
 
 ## Douyin Auto Publish (Image Post)
 
@@ -127,11 +129,11 @@ python verify_douyin_image_publish.py --title "自动发布测试" --images .\te
 3. Follow instructions to create bot
 4. Copy the token
 
-### Minimax API
-1. Visit https://platform.minimax.chat/
+### OpenRouter API
+1. Visit https://openrouter.ai/
 2. Sign up / Sign in
 3. Create API key in dashboard
-4. Get Group ID from your account settings
+4. Put it into `OPEN_ROUTER_KEY`
 
 ## Project Structure
 

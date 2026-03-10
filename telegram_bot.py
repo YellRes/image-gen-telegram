@@ -1,11 +1,13 @@
 """
 Telegram Bot for Image Generation
-Receives messages from Telegram and generates images using Minimax API
+Receives messages from Telegram and generates images using OpenRouter API
 """
 
 import os
 import logging
 import asyncio
+import hashlib
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -32,7 +34,7 @@ load_dotenv()
 
 # Environment variables
 TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN", "")
-MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
+OPEN_ROUTER_KEY = os.getenv("OPEN_ROUTER_KEY", "")
 PROXY_URL = os.getenv("PROXY_URL", "")
 ENABLE_DOUYIN_IMAGE_PUBLISH = is_douyin_publish_enabled()
 DOUYIN_ACCOUNT_FILE = os.getenv("DOUYIN_ACCOUNT_FILE", "")
@@ -48,6 +50,16 @@ MAX_IMAGE_COUNT = 4
     WAITING_FOR_PROMPT,
     WAITING_FOR_SIZE,
 ) = range(2)
+
+
+def _build_archive_output_path(user_id: int, prompt: str, index: int) -> str:
+    """Build archive path: images/YYYY/MM/DD/<unique-name>.jpeg."""
+    now = datetime.now()
+    date_dir = Path("images") / now.strftime("%Y") / now.strftime("%m") / now.strftime("%d")
+    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
+    timestamp = now.strftime("%H%M%S%f")
+    filename = f"{user_id}_{prompt_hash}_{index}_{timestamp}.jpeg"
+    return str(date_dir / filename)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -96,10 +108,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         status.append("❌ Telegram Bot Token: NOT SET (TG_BOT_TOKEN)")
     
-    if MINIMAX_API_KEY:
-        status.append("✅ Minimax API Key: Configured")
+    if OPEN_ROUTER_KEY:
+        status.append("✅ OpenRouter API Key: Configured")
     else:
-        status.append("❌ Minimax API Key: NOT SET (MINIMAX_API_KEY)")
+        status.append("❌ OpenRouter API Key: NOT SET (OPEN_ROUTER_KEY)")
 
     quality = context.user_data.get("quality", DEFAULT_QUALITY)
     quality_label = QUALITY_PRESETS.get(quality, QUALITY_PRESETS[DEFAULT_QUALITY])["label"]
@@ -230,9 +242,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Received prompt from {user.name}: {prompt}")
     
     # Check if API keys are configured
-    if not MINIMAX_API_KEY:
+    if not OPEN_ROUTER_KEY:
         await update.message.reply_text(
-            "❌ Bot is not properly configured. Please set MINIMAX_API_KEY environment variable."
+            "❌ Bot is not properly configured. Please set OPEN_ROUTER_KEY environment variable."
         )
         return
     
@@ -250,13 +262,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     generated_paths = []
     try:
         for i in range(image_count):
-            output_path = f"temp/{user.id}_{hash(prompt)}_{i + 1}.jpeg"
+            output_path = _build_archive_output_path(user.id, prompt, i + 1)
             image_path = text_to_image(
                 prompt=generation_prompt,
                 output_path=output_path,
                 aspect_ratio=preset.get("aspect_ratio"),
                 image_size=preset.get("image_size"),
-                model="image-01",
+                model="google/gemini-3-flash-preview",
             )
             generated_paths.append(image_path)
 
@@ -292,12 +304,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error generating image: {e}")
         await processing_msg.edit_text(f"❌ Error generating image: {str(e)}")
-    finally:
-        for path in generated_paths:
-            try:
-                os.remove(path)
-            except Exception:
-                pass
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -315,7 +321,7 @@ def main():
         return
     
     print("🚀 Starting Telegram Bot...")
-    print(f"📝 Bot will generate images using Minimax API")
+    print("📝 Bot will generate images using OpenRouter API")
     
     # Create application
     builder = Application.builder().token(TG_BOT_TOKEN)

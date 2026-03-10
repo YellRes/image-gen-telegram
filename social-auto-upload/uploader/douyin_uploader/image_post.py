@@ -153,11 +153,6 @@ class DouYinImagePost(object):
             douyin_logger.info("[+] 正在上传抖音图文")
             await self._upload_images(page)
 
-    
-            # await page.pause()
-            # await self._fill_title_and_tags(page)
-            
-
             await page.wait_for_timeout(500)
             await self.cover_setted(page)
             await self.douyin_checked(page)
