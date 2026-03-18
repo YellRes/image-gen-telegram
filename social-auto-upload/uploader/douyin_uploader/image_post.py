@@ -26,7 +26,7 @@ class DouYinImagePost(object):
             wait_until="domcontentloaded",
             timeout=90000,
         )
-        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload**")
+        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload**", timeout=60000)
 
         # 创作者中心有时会先落到视频页，优先切换到图文标签。
         image_tab = page.get_by_text("发布图文")
@@ -100,11 +100,12 @@ class DouYinImagePost(object):
         for _ in range(20):
             try:
                 publish_button = page.get_by_role("button", name="发布", exact=True)
+                await asyncio.sleep(10)
                 if await publish_button.count():
                     await publish_button.first.click()
                 await page.wait_for_url(
                     "https://creator.douyin.com/creator-micro/content/manage**",
-                    timeout=5000,
+                    timeout=20000,
                 )
                 return
             except Exception:
@@ -191,7 +192,7 @@ class DouYinImagePost(object):
             await page.wait_for_timeout(500)
             await self.cover_setted(page)
             await self.douyin_checked(page)
-            await self.quick_setted(page)
+            # await self.quick_setted(page)
             await self._publish(page)
             douyin_logger.success("[+] 抖音图文发布成功")
             await context.storage_state(path=self.account_file)

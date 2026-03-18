@@ -20,7 +20,7 @@ async def cookie_auth_douyin(account_file):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://creator.douyin.com/creator-micro/content/upload")
+        await page.goto("https://creator.douyin.com/creator-micro/content/upload", wait_until="domcontentloaded", timeout=60000)
         try:
             await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload", timeout=5000)
             # 2024.06.17 抖音创作者中心改版
@@ -48,7 +48,7 @@ async def cookie_auth_tencent(account_file):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://channels.weixin.qq.com/platform/post/create")
+        await page.goto("https://channels.weixin.qq.com/platform/post/create", wait_until="domcontentloaded", timeout=60000)
         try:
             await page.wait_for_selector('div.title-name:has-text("微信小店")', timeout=5000)  # 等待5秒
             tencent_logger.error("[+] 等待5秒 cookie 失效")
@@ -66,7 +66,7 @@ async def cookie_auth_ks(account_file):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://cp.kuaishou.com/article/publish/video")
+        await page.goto("https://cp.kuaishou.com/article/publish/video", wait_until="domcontentloaded", timeout=60000)
         try:
             await page.wait_for_selector("div.names div.container div.name:text('机构服务')", timeout=5000)  # 等待5秒
 
@@ -85,7 +85,7 @@ async def cookie_auth_xhs(account_file):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://creator.xiaohongshu.com/creator-micro/content/upload")
+        await page.goto("https://creator.xiaohongshu.com/creator-micro/content/upload", wait_until="domcontentloaded", timeout=60000)
         try:
             await page.wait_for_url("https://creator.xiaohongshu.com/creator-micro/content/upload", timeout=5000)
         except:

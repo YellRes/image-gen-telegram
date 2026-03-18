@@ -27,7 +27,7 @@ async def douyin_cookie_gen(id,status_queue):
         context = await set_init_script(context)
         # Pause the page, and start recording manually.
         page = await context.new_page()
-        await page.goto("https://creator.douyin.com/")
+        await page.goto("https://creator.douyin.com/", wait_until="domcontentloaded", timeout=60000)
         original_url = page.url
         img_locator = page.get_by_role("img", name="二维码")
         # 获取 src 属性值
@@ -97,7 +97,7 @@ async def get_tencent_cookie(id,status_queue):
         # Pause the page, and start recording manually.
         context = await set_init_script(context)
         page = await context.new_page()
-        await page.goto("https://channels.weixin.qq.com")
+        await page.goto("https://channels.weixin.qq.com", wait_until="domcontentloaded", timeout=60000)
         original_url = page.url
 
         # 监听页面的 'framenavigated' 事件，只关注主框架的变化
@@ -174,7 +174,7 @@ async def get_ks_cookie(id,status_queue):
         context = await set_init_script(context)
         # Pause the page, and start recording manually.
         page = await context.new_page()
-        await page.goto("https://cp.kuaishou.com")
+        await page.goto("https://cp.kuaishou.com", wait_until="domcontentloaded", timeout=60000)
 
         # 定位并点击“立即登录”按钮（类型为 link）
         await page.get_by_role("link", name="立即登录").click()
@@ -250,7 +250,7 @@ async def xiaohongshu_cookie_gen(id,status_queue):
         context = await set_init_script(context)
         # Pause the page, and start recording manually.
         page = await context.new_page()
-        await page.goto("https://creator.xiaohongshu.com/")
+        await page.goto("https://creator.xiaohongshu.com/", wait_until="domcontentloaded", timeout=60000)
         await page.locator('img.css-wemwzq').click()
 
         img_locator = page.get_by_role("img").nth(2)

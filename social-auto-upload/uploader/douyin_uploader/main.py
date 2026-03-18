@@ -18,9 +18,9 @@ async def cookie_auth(account_file):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://creator.douyin.com/creator-micro/content/upload")
+        await page.goto("https://creator.douyin.com/creator-micro/content/upload", wait_until="domcontentloaded", timeout=60000)
         try:
-            await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload", timeout=5000)
+            await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload", timeout=50000)
         except:
             print("[+] 等待5秒 cookie 失效")
             await context.close()
@@ -57,7 +57,7 @@ async def douyin_cookie_gen(account_file):
         context = await set_init_script(context)
         # Pause the page, and start recording manually.
         page = await context.new_page()
-        await page.goto("https://creator.douyin.com/")
+        await page.goto("https://creator.douyin.com/", wait_until="domcontentloaded", timeout=60000)
         await page.pause()
         # 点击调试器的继续，保存cookie
         await context.storage_state(path=account_file)
@@ -110,11 +110,11 @@ class DouYinVideo(object):
         # 创建一个新的页面
         page = await context.new_page()
         # 访问指定的 URL
-        await page.goto("https://creator.douyin.com/creator-micro/content/upload")
+        await page.goto("https://creator.douyin.com/creator-micro/content/upload", wait_until="domcontentloaded", timeout=60000)
         douyin_logger.info(f'[+]正在上传-------{self.title}.mp4')
         # 等待页面跳转到指定的 URL，没进入，则自动等待到超时
         douyin_logger.info(f'[-] 正在打开主页...')
-        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload")
+        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload", timeout=60000)
         # 点击 "上传视频" 按钮
         await page.locator("div[class^='container'] input").set_input_files(self.file_path)
 
@@ -209,7 +209,7 @@ class DouYinVideo(object):
                 if await publish_button.count():
                     await publish_button.click()
                 await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage**",
-                                        timeout=3000)  # 如果自动跳转到作品页面，则代表发布成功
+                                        timeout=30000)  # 如果自动跳转到作品页面，则代表发布成功
                 douyin_logger.success("  [-]视频发布成功")
                 break
             except:

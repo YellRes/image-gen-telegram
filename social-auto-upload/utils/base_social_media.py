@@ -18,7 +18,13 @@ def get_cli_action() -> List[str]:
     return ["upload", "login", "watch"]
 
 
+# 全局默认超时（毫秒）：所有 wait_for_url / wait_for_selector / locator 等操作均适用
+DEFAULT_PLAYWRIGHT_TIMEOUT_MS = 120_000
+
+
 async def set_init_script(context):
     stealth_js_path = Path(BASE_DIR / "utils/stealth.min.js")
     await context.add_init_script(path=stealth_js_path)
+    # 一次性设置该 context 下所有 Playwright 操作的默认超时为 120 秒
+    context.set_default_timeout(DEFAULT_PLAYWRIGHT_TIMEOUT_MS)
     return context

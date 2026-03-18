@@ -263,12 +263,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         for i in range(image_count):
             output_path = _build_archive_output_path(user.id, prompt, i + 1)
-            image_path = text_to_image(
+            image_path = await asyncio.to_thread(
+                text_to_image,
                 prompt=generation_prompt,
                 output_path=output_path,
                 aspect_ratio=preset.get("aspect_ratio"),
                 image_size=preset.get("image_size"),
-                model="google/gemini-3-flash-preview",
+                model="google/gemini-3.1-flash-image-preview",
             )
             generated_paths.append(image_path)
 
