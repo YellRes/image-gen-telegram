@@ -3,6 +3,7 @@ Telegram Image Gen - Text to Image using OpenRouter API
 """
 
 import os
+import time
 import requests
 import base64
 import json
@@ -15,10 +16,22 @@ from dotenv import load_dotenv
 # Configuration
 load_dotenv()
 OPEN_ROUTER_KEY = os.getenv("OPEN_ROUTER_KEY", "")
+SOCHEAP_API_KEY = os.getenv("SOCHEAP_API_KEY", "")
+SOCHEAP_BASE_URL = os.getenv("SOCHEAP_BASE_URL", "https://socheap.ai")
+
+_SUPPORTED_PROVIDERS = ("openrouter", "socheap")
+IMAGE_PROVIDER = os.getenv("IMAGE_PROVIDER", "openrouter")
+if IMAGE_PROVIDER not in _SUPPORTED_PROVIDERS:
+    raise ValueError(
+        f"IMAGE_PROVIDER='{IMAGE_PROVIDER}' 不受支持，可选值：{_SUPPORTED_PROVIDERS}"
+    )
+if IMAGE_PROVIDER == "socheap" and not SOCHEAP_API_KEY:
+    raise ValueError("IMAGE_PROVIDER=socheap 需要设置 SOCHEAP_API_KEY 环境变量")
 
 # API endpoints
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_OPENROUTER_IMAGE_MODEL = "google/gemini-3.1-flash-image-preview"
+DEFAULT_SOCHEAP_IMAGE_MODEL = "gpt-image-2"
 
 try:
     from douyin_image_publish import publish_images_to_douyin, is_douyin_publish_enabled
@@ -106,18 +119,95 @@ def _extract_openrouter_image_data(response_data: dict) -> tuple[str, str]:
         raise Exception(f"Failed to parse OpenRouter image response: {json.dumps(response_data)[:500]}. Error: {str(e)}")
 
 
-def text_to_image(prompt: str, output_path: str = None, **kwargs) -> str:
-    """
-    Generate image from text using OpenRouter API.
-    
-    Args:
-        prompt: Text description of the image to generate
-        output_path: Path to save the generated image (optional)
-        **kwargs: Additional parameters
-    
-    Returns:
-        Path to the generated image or base64 encoded image data
-    """
+def _poll_socheap_job(job_id: str, headers: dict, timeout: int) -> str:
+    """轮询 SoCheap.AI 任务直到完成，返回图片 URL。"""
+    poll_url = f"{SOCHEAP_BASE_URL}/media/image/generations/{job_id}"
+    elapsed = 0
+    consecutive_errors = 0
+
+    while elapsed < timeout:
+        time.sleep(2)
+        elapsed += 2
+
+        try:
+            resp = requests.get(poll_url, headers=headers, timeout=30)
+        except requests.RequestException:
+            consecutive_errors += 1
+            if consecutive_errors >= 3:
+                raise Exception(f"SoCheap.AI 轮询连续 3 次网络错误，job_id={job_id}")
+            continue
+
+        if not resp.ok:
+            consecutive_errors += 1
+            if consecutive_errors >= 3:
+                raise Exception(
+                    f"SoCheap.AI 轮询 HTTP {resp.status_code} 连续 3 次失败，job_id={job_id}"
+                )
+            continue
+
+        consecutive_errors = 0
+        data = resp.json().get("data", {})
+
+        if data.get("status") == "completed":
+            outputs = data.get("result", {}).get("outputs", [])
+            if not outputs:
+                raise Exception(f"SoCheap.AI job {job_id} 已完成但 outputs 为空")
+            return outputs[0]
+
+    raise Exception(f"SoCheap.AI job {job_id} 超时（已等待 {elapsed}s）")
+
+
+def _text_to_image_socheap(prompt: str, output_path: str = None, **kwargs) -> str:
+    """通过 SoCheap.AI 异步 API 生成图片。"""
+    headers = {
+        "Authorization": f"Bearer {SOCHEAP_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": kwargs.get("model", DEFAULT_SOCHEAP_IMAGE_MODEL),
+        "prompt": prompt,
+        "resolution": kwargs.get("resolution", "1K"),
+        "aspect_ratio": kwargs.get("aspect_ratio", "9:16"),
+    }
+
+    # 创建任务
+    resp = requests.post(
+        f"{SOCHEAP_BASE_URL}/media/image/generations",
+        headers=headers,
+        json=payload,
+        timeout=kwargs.get("timeout", 60),
+    )
+    if not resp.ok:
+        raise Exception(f"SoCheap.AI API 错误 {resp.status_code}: {resp.text[:500]}")
+
+    result = resp.json()
+    if result.get("code") != 0:
+        raise Exception(f"SoCheap.AI 错误: {result.get('message', 'Unknown error')}")
+
+    job_id = result["data"]["id"]
+
+    # 轮询直到完成
+    image_url = _poll_socheap_job(job_id, headers, timeout=kwargs.get("timeout", 120))
+
+    # 下载图片
+    img_resp = requests.get(image_url, timeout=60)
+    if not img_resp.ok:
+        raise Exception(
+            f"SoCheap.AI 图片下载失败 {img_resp.status_code}: {image_url}"
+        )
+
+    if output_path:
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "wb") as f:
+            f.write(img_resp.content)
+        return output_path
+
+    return image_url
+
+
+def _text_to_image_openrouter(prompt: str, output_path: str = None, **kwargs) -> str:
+    """通过 OpenRouter API 生成图片。"""
     if not OPEN_ROUTER_KEY:
         raise Exception("OPEN_ROUTER_KEY is not set")
 
@@ -199,6 +289,13 @@ def text_to_image(prompt: str, output_path: str = None, **kwargs) -> str:
     return image_base64 or image_url
 
 
+def text_to_image(prompt: str, output_path: str = None, **kwargs) -> str:
+    """根据 IMAGE_PROVIDER 环境变量分发到对应的图片生成 provider。"""
+    if IMAGE_PROVIDER == "socheap":
+        return _text_to_image_socheap(prompt, output_path, **kwargs)
+    return _text_to_image_openrouter(prompt, output_path, **kwargs)
+
+
 def text_to_image_sync(prompt: str, timeout: int = 120) -> str:
     """
     Backward-compatible wrapper.
@@ -272,12 +369,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Text to Image using OpenRouter")
     parser.add_argument("prompt", help="Text prompt for image generation")
     parser.add_argument("-o", "--output", help="Output file path", default="output.jpeg")
-    parser.add_argument("--model", default=DEFAULT_OPENROUTER_IMAGE_MODEL, help="OpenRouter image model")
+    parser.add_argument("--model", default=None, help="Image model (provider-specific; defaults to provider's default)")
     parser.add_argument("--api-key", help="OpenRouter API key (or set OPEN_ROUTER_KEY env)")
     parser.add_argument("--raw-prompt", action="store_true", help="Use raw prompt without comic explain template")
-    
+
     args = parser.parse_args()
-    
+
     # Override env vars if provided
     if args.api_key:
         OPEN_ROUTER_KEY = args.api_key
@@ -289,13 +386,14 @@ if __name__ == "__main__":
     )
 
     print(f"Generating image for: {args.prompt}")
-    
+
+    extra = {"model": args.model} if args.model else {}
     try:
         output_path = text_to_image(
             prompt=final_prompt,
             output_path=args.output,
-            model=args.model,
+            **extra,
         )
-        print(f"✅ Image saved to: {output_path}")
+        print(f"[OK] Image saved to: {output_path}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] {e}")
